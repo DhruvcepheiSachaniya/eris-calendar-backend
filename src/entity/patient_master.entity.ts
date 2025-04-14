@@ -1,10 +1,13 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import { PatientResponse } from "./patient_response.entity";
+import { Session } from "./session.entity";
 
 @Entity('patient_master')
 export class Patient_master_entity {
     @PrimaryGeneratedColumn()
     id: number;
+
+    @Column({ nullable: true})
+    patient_code: string;
 
     @Column({ nullable: true})
     patient_name: string;
@@ -14,6 +17,12 @@ export class Patient_master_entity {
 
     @Column({ nullable: true})
     patient_gender: string;
+
+    @Column({ nullable: true})
+    prescription_img: string;
+
+    @Column({ nullable: true})
+    report_img: string;
 
     @Column({ nullable: true})
     sync_status: Date;
@@ -28,6 +37,9 @@ export class Patient_master_entity {
     patient_sign: string;
 
     //relation --> Doctor
-    @OneToMany(() => PatientResponse, (patient) => patient.patient)
-    patient_responses: PatientResponse[];
+    @Column({ nullable: true})
+    dr_Code: string;
+
+    @OneToMany(() => Session, (session) => session.patient)
+    sessions: Session[];
 } 

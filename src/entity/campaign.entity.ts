@@ -1,6 +1,5 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import { FormMaster } from "./form_master.entity";
-import { PatientResponse } from "./patient_response.entity";
+import { Session } from "./session.entity";
 
 @Entity('campaign')
 export class Campaign {
@@ -14,12 +13,15 @@ export class Campaign {
     description: string;
 
     @Column({ nullable: true })
+    campaign_img: string;
+
+    @Column({ nullable: true })
     created_at: Date;
 
     @Column({ nullable: true })
     updated_at: Date;
 
     //relationships
-    @OneToMany(() => FormMaster, (formmaster) => formmaster.campaign)
-    form_masters: FormMaster[];
+    @OneToMany(() => Session, (session) => session.campaign)
+    sessions: Session[];
 }
