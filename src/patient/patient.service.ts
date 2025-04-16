@@ -31,33 +31,33 @@ export class PatientService {
         }
     }
 
-    // async uploadToS3(image: Express.Multer.File): Promise<string> {
-    //     try {
-    //         const { buffer, mimetype } = image;
-    //         console.log("buffer", buffer);
+    async uploadToS3(image: Express.Multer.File): Promise<string> {
+        try {
+            const { buffer, mimetype } = image;
+            console.log("buffer", buffer);
 
-    //         const fileExtension = image.originalname.split('.').pop();
+            const fileExtension = image.originalname.split('.').pop();
 
-    //         const signedURL = await this.getPresignedURL({
-    //             file_name: `patientfeedback${Date.now()}.${fileExtension}`,
-    //         });
+            const signedURL = await this.getPresignedURL({
+                file_name: `eris-calendar${Date.now()}.${fileExtension}`,
+            });
 
-    //         const s3Response = await fetch(signedURL, {
-    //             method: 'PUT',
-    //             body: buffer,
-    //             headers: {
-    //                 'Content-Type': `${mimetype}`,
-    //             },
-    //             redirect: 'follow',
-    //         });
+            const s3Response = await fetch(signedURL, {
+                method: 'PUT',
+                body: buffer,
+                headers: {
+                    'Content-Type': `${mimetype}`,
+                },
+                redirect: 'follow',
+            });
 
-    //         if (s3Response) {
-    //             const image_url: string = s3Response?.url.split('?')[0];
-    //             return image_url;
-    //         }
-    //         // return s3Response
-    //     } catch (error: any) {
-    //         throw error;
-    //     }
-    // }
+            if (s3Response) {
+                const image_url: string = s3Response?.url.split('?')[0];
+                return image_url;
+            }
+            // return s3Response
+        } catch (error: any) {
+            throw error;
+        }
+    }
 }

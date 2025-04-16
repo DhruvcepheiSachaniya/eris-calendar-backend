@@ -2,16 +2,13 @@ import { Body, Controller, Get, Patch, Post, Put, Query, UseInterceptors } from 
 import { SessionService } from "./session.service";
 import { AddSessionDto } from "./dto/addsession.dto";
 import { EditSessionDto } from "./dto/editsession.dto";
+import { EndSessionDto } from "./dto/endsession.dto";
 
 @Controller('api/session')
 export class SessionController {
     constructor(
         private sessionService: SessionService
     ) { }
-
-    //Add session, start session, edit session, view session, continue session, end session
-    //session details based on value
-    //per session summary
 
     // ? Add Session
     @Post('add')
@@ -21,7 +18,12 @@ export class SessionController {
         return this.sessionService.AddSession(dto);
     }
 
-    // ? Not Fix yet for start session
+    @Post('start')
+    async StartSession(
+        @Body('sessionid') sessionid: number
+    ) {
+        return this.sessionService.StartSession(sessionid);
+    }
 
     // ? Edit Session
     @Put('edit')
@@ -31,25 +33,25 @@ export class SessionController {
         return this.sessionService.EditSession(dto);
     }
 
-    // ? Get session Data based on What passed
-    @Get('sessions')
-    async GetSessions(
-        @Query('startDate') startDate: string,
-        @Query('endDate') endDate: string,
-        @Query('empCode') empCode?: string
-    ) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        return this.sessionService.GetSessions(start, end, empCode);
-    }
-
     // ? Get One Session detail and summary
-    @Get('detail')
+    @Get('enddetail')
     async GetSessionDetail(
-        // @Query()
+        @Query('sessionid') sessionid: number
     ) {
-        //
+        return this.sessionService.GetSessionDetails(sessionid);
     }
 
+    @Post('end')
+    async EndSession(
+        @Body() dto: EndSessionDto 
+    ) {
+        return this.sessionService.EndSession(dto);
+    }
+
+    @Get('patient/count')
+    async GetPatientCount(
+        @Query('sessionid') sessionid: number
+    ) {
+        return this.sessionService.GetSessionPatientCount(sessionid);
+    }
 }

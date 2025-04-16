@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinTable, ManyToMany, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { Campaign } from "./campaign.entity";
 import { Patient_master_entity } from "./patient_master.entity";
 
@@ -24,6 +24,9 @@ export class Session {
     end_time: Date;
 
     @Column({ nullable: true })
+    buffer_used: boolean;
+
+    @Column({ nullable: true })
     camp_executed: string;
 
     @Column({ nullable: true })
@@ -41,12 +44,17 @@ export class Session {
     dr_code: string;
 
     @Column({ nullable: true })
+    dr_speciality: string;
+
+    @Column({ nullable: true })
     empCode: string;
 
     @ManyToOne(() => Campaign, (campaign) => campaign.sessions)
     campaign: Campaign;
 
-    @ManyToOne(() => Patient_master_entity, (patient) => patient.sessions)
-    patient: Patient_master_entity;
+    @ManyToMany(() => Patient_master_entity, (patient) => patient.sessions)
+    @JoinTable() // This will create a join table named 'session_patients_patient_master_entity'
+    patients: Patient_master_entity[];
+
 
 }

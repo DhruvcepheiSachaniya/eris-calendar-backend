@@ -1,22 +1,28 @@
-import { Body, Controller, Get, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { CampaignService } from "./campaign.service";
 import { JwtAuthGuard } from "src/auth/guard/jwt.guard";
 import { CreateFormDto } from "./dto/form.dto";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { PatientService } from "src/patient/patient.service";
 
 @Controller('api/campaign')
 export class CampaignController {
     constructor (
-        private campaignService: CampaignService
+        private campaignService: CampaignService,
+        private patientService: PatientService
     ) {} 
 
     // ? Post New Campaign
     // @UseGuards(JwtAuthGuard)
     @Post('new')
+    @UseInterceptors(FileInterceptor('file'))
     async PostCampaign(
-        @Body() name: string,
-        @Body() description: string
+        @Body('name') name: string,
+        @Body('description') description: string,
+        @UploadedFile() file?: Express.Multer.File
     ) {
-        return this.campaignService.PostCampaign(name, description);
+        const img_Url = await this.patientService.uploadToS3(file);
+        return this.campaignService.PostCampaign(name, description, img_Url);
     }
 
     // ? Get Campaign List
@@ -26,27 +32,10 @@ export class CampaignController {
         return this.campaignService.getAllCampaign();
     }
 
-    // ? Campaign Based Form
-    @Post('form')
-    async CreateCampaignBasedForm (
-        @Body() dto: CreateFormDto
+    @Get('details')
+    async getCampaignbasedsessions(
+        @Body('campaignid') campaignid: number
     ) {
-        // return this.campaignService.CreateCampaignBasedForm(dto);
-    }
-
-    // ? Get Campaign Based Form
-    @Get('form')
-    async getCampaignBasedForm(
-        @Query() CampaignName: string,
-    ) {
-        // return this.campaignService.GetCampaignBasedForm(CampaignName);
-    }
-
-    // ? Update Campaign Based Form
-    @Patch('form')
-    async UpdateCampaignBasedForm(
-        @Body() dto: CreateFormDto
-    ) {
-        // return this.campaignService.UpdateCampaignBasedForm(dto);
+        return this.campaignService.getCampaignbasedsessions(campaignid)
     }
 }
