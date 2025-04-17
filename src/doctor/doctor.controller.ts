@@ -15,4 +15,11 @@ export class DoctorController {
     ) {
         return this.doctorService.GetDoctorList(empCode);
     }
+
+    @Get('doctordetails')
+    async getDoctorDetails(
+        @Query('drcode') drcode: string,
+    ) {
+        return this.doctorService.GetDoctorDetails(drcode);
+    }
 }

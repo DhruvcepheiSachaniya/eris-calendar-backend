@@ -3,13 +3,12 @@ import { CampaignController } from "./campaign.controller";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { CampaignService } from "./campaign.service";
 import { Campaign } from "src/entity/campaign.entity";
-import { PatientService } from "src/patient/patient.service";
-import { DoctorService } from "src/doctor/doctor.service";
+import { PatientModule } from "src/patient/patient.module";
 
 @Module({
-    imports: [TypeOrmModule.forFeature([ Campaign ])],
+    imports: [TypeOrmModule.forFeature([ Campaign ]), PatientModule],
     controllers: [CampaignController],
-    providers: [CampaignService, PatientService, DoctorService],
+    providers: [CampaignService],
     exports:[]
 })
 

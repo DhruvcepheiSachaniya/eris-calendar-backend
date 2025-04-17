@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DoctorService } from "src/doctor/doctor.service";
+import axios from "axios";
 import { Campaign } from "src/entity/campaign.entity";
 import { SessionStatus } from "src/entity/session.entity";
 import { Repository } from "typeorm";
@@ -10,7 +10,6 @@ export class CampaignService {
     constructor(
         @InjectRepository(Campaign)
         private readonly campaignRepository: Repository<Campaign>,
-        private doctorservice: DoctorService
     ) { }
 
     async PostCampaign(name: string, description: string, img_Url: string) {
@@ -47,8 +46,16 @@ export class CampaignService {
         }
     }
 
-    async getAllCampaign() {
+    async getAllCampaign(empcode: string) {
         try {
+            // Fetch doctor list from external api
+            // const externalAPI = `http://localhost:4444/api/doctorlist?empCode=${empcode}`;
+
+            // const external_response = await axios.get(externalAPI);
+
+            // const validDoctorCodes: string[] = external_response.data?.doctors?.map(d => d.drCode) || [];
+            // the sessions will fiter by doctorlist ---
+
             const all_campaign = await this.campaignRepository.find({
                 relations: ['sessions', 'sessions.patients']
             });

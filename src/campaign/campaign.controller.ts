@@ -28,8 +28,10 @@ export class CampaignController {
     // ? Get Campaign List
     // @UseGuards(JwtAuthGuard)
     @Get('list')
-    async GetCampaignList() {
-        return this.campaignService.getAllCampaign();
+    async GetCampaignList(
+        @Query('empcode') empcode: string
+    ) {
+        return this.campaignService.getAllCampaign(empcode);
     }
 
     @Get('details')
