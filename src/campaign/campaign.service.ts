@@ -46,47 +46,118 @@ export class CampaignService {
         }
     }
 
+    // async getAllCampaign(empcode: string) {
+    //     try {
+    //         // Fetch doctor list from external api
+    //         const externalAPI = `http://localhost:4444/api/doctorlist?empCode=${empcode}`;
+
+    //         const external_response = await axios.get(externalAPI);
+
+    //         const validDoctorCodes: string[] = external_response.data?.doctors?.map(d => d.drCode) || [];
+    //         // the sessions will fiter by doctorlist ---
+
+    //         const all_campaign = await this.campaignRepository.find({
+    //             relations: ['sessions', 'sessions.patients']
+    //         });
+    
+    //         if (!all_campaign || all_campaign.length === 0) {
+    //             throw new HttpException("No Campaign found", HttpStatus.NOT_FOUND);
+    //         }
+    
+    //         let total_scheduled_sessions = 0;
+    //         let total_session_completed = 0;
+    //         const doctorSet = new Set<string>();
+    //         let total_patients = 0;
+    
+    //         all_campaign.forEach((campaign) => {
+    //             campaign.sessions.forEach(async (session) => {
+    //                 if (session.status === SessionStatus.Scheduled) {
+    //                     total_scheduled_sessions++;
+    //                 }
+    
+    //                 if (session.status === SessionStatus.Ended) {
+    //                     total_session_completed++;
+    //                 }
+    
+    //                 if (session.dr_code) {
+    //                     doctorSet.add(session.dr_code);
+    //                 }
+    
+    //                 total_patients += session.patients?.length || 0;
+    //             });
+    //         });
+    
+    //         return {
+    //             status: "success",
+    //             stats: {
+    //                 scheduled_sessions: total_scheduled_sessions,
+    //                 session_completed: total_session_completed,
+    //                 associated_doctor: doctorSet.size,
+    //                 total_patients: total_patients
+    //             },
+    //             all_campaign
+    //         };
+    //     } catch (err) {
+    //         throw new HttpException(
+    //             err instanceof HttpException ? err.getResponse() : "Internal Server Error",
+    //             err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
+    //         );
+    //     }
+    // }
     async getAllCampaign(empcode: string) {
         try {
             // Fetch doctor list from external api
-            // const externalAPI = `http://localhost:4444/api/doctorlist?empCode=${empcode}`;
-
-            // const external_response = await axios.get(externalAPI);
-
-            // const validDoctorCodes: string[] = external_response.data?.doctors?.map(d => d.drCode) || [];
-            // the sessions will fiter by doctorlist ---
-
+            const externalAPI = `http://localhost:4444/api/doctorlist?empCode=${empcode}`;
+            
+            const external_response = await axios.get(externalAPI);
+            
+            const validDoctorCodes: string[] = external_response.data?.doctors?.map(d => d.drCode) || [];
+            
+            // Fetch all campaigns with their sessions and patients
             const all_campaign = await this.campaignRepository.find({
                 relations: ['sessions', 'sessions.patients']
             });
-    
+            
             if (!all_campaign || all_campaign.length === 0) {
                 throw new HttpException("No Campaign found", HttpStatus.NOT_FOUND);
             }
-    
+            
+            // Filter and process campaigns based on valid doctor codes
             let total_scheduled_sessions = 0;
             let total_session_completed = 0;
             const doctorSet = new Set<string>();
             let total_patients = 0;
-    
-            all_campaign.forEach((campaign) => {
-                campaign.sessions.forEach(async (session) => {
+            
+            // Create deep copy of campaigns to manipulate
+            const filtered_campaigns = all_campaign.map(campaign => {
+                // Create a new object for the filtered campaign
+                const filteredCampaign = {
+                    ...campaign,
+                    sessions: campaign.sessions.filter(session => 
+                        validDoctorCodes.includes(session.dr_code)
+                    )
+                };
+                
+                // Count statistics for filtered sessions
+                filteredCampaign.sessions.forEach(session => {
                     if (session.status === SessionStatus.Scheduled) {
                         total_scheduled_sessions++;
                     }
-    
+                    
                     if (session.status === SessionStatus.Ended) {
                         total_session_completed++;
                     }
-    
+                    
                     if (session.dr_code) {
                         doctorSet.add(session.dr_code);
                     }
-    
+                    
                     total_patients += session.patients?.length || 0;
                 });
+                
+                return filteredCampaign;
             });
-    
+            
             return {
                 status: "success",
                 stats: {
@@ -95,60 +166,96 @@ export class CampaignService {
                     associated_doctor: doctorSet.size,
                     total_patients: total_patients
                 },
-                all_campaign
+                all_campaign: filtered_campaigns
             };
         } catch (err) {
+            if (err.response) {
+                console.error('Error status:', err.response.status);
+                console.error('Error data:', err.response.data);
+        
+                // Bubble up microservice error
+                throw new HttpException(
+                    err.response.data?.message || 'External service error',
+                    err.response.status
+                );
+            }
             throw new HttpException(
                 err instanceof HttpException ? err.getResponse() : "Internal Server Error",
                 err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
             );
         }
     }
-    
 
-    async getCampaignbasedsessions(campaignid: number) {
+    async getCampaignbasedsessions(campaignid: number, empcode: string) {
         try {
-            // ! Need to return --> Scheduled Sessions, Assoiated doctor, Session completed, Total Patients
+            // 1. Fetch valid doctor codes from external API
+            const externalAPI = `http://localhost:4444/api/doctorlist?empCode=${empcode}`;
+            
+            const external_response = await axios.get(externalAPI);
+            
+            const validDoctorCodes: string[] = external_response.data?.doctors?.map(d => d.drCode) || [];
+            
+            // 2. Fetch campaign with sessions and patients
             const campaign = await this.campaignRepository.findOne({
                 where: {
                     id: campaignid
                 },
                 relations: ['sessions', 'sessions.patients']
             });
-
+    
             if (!campaign) {
                 throw new HttpException("Campaign not found", HttpStatus.NOT_FOUND);
             }
-
-            const sessions = campaign.sessions;
-
-            // Scheduled sessions
-            const scheduled_sessions_count = sessions.filter(session => session.status === SessionStatus.Scheduled).length;
-
-            // Completed sessions
-            const session_completed_count = sessions.filter(session => session.status === SessionStatus.Ended).length;
-
-            // Unique doctors (remove duplicates)
-            const uniqueDoctors = [...new Set(sessions.map(session => session.dr_code).filter(Boolean))];
-
-            // Total patients across all sessions
+    
+            // 3. Filter sessions by valid doctor codes
+            const filteredSessions = campaign.sessions.filter(session => 
+                validDoctorCodes.includes(session.dr_code)
+            );
+    
+            // 4. Create a filtered campaign object
+            const filteredCampaign = {
+                ...campaign,
+                sessions: filteredSessions
+            };
+    
+            // 5. Calculate statistics based on filtered sessions
+            const scheduled_sessions_count = filteredSessions.filter(session => 
+                session.status === SessionStatus.Scheduled
+            ).length;
+    
+            const session_completed_count = filteredSessions.filter(session => 
+                session.status === SessionStatus.Ended
+            ).length;
+    
+            const uniqueDoctors = [...new Set(filteredSessions.map(session => 
+                session.dr_code
+            ).filter(Boolean))];
+    
             let totalPatients = 0;
-            for (const session of sessions) {
+            for (const session of filteredSessions) {
                 totalPatients += session.patients?.length || 0;
             }
-
-            const total_patient_count = campaign.sessions;
-
+    
             return {
                 status: "success",
                 scheduled_sessions: scheduled_sessions_count,
                 associated_doctor: uniqueDoctors.length,
                 session_completed: session_completed_count,
                 total_patients: totalPatients,
-                data: campaign,
+                data: filteredCampaign,
             }
-
+    
         } catch (err) {
+            if (err.response) {
+                console.error('Error status:', err.response.status);
+                console.error('Error data:', err.response.data);
+        
+                // Bubble up microservice error
+                throw new HttpException(
+                    err.response.data?.message || 'External service error',
+                    err.response.status
+                );
+            }
             throw new HttpException(
                 err instanceof HttpException ? err.getResponse() : "Internal Server Error",
                 err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR

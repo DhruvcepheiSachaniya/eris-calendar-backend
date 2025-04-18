@@ -7,10 +7,12 @@ import { UserModule } from './user/user.module';
 import { DoctorModule } from './doctor/doctor.module';
 import { PatientModule } from './patient/patient.module';
 import { CampaignModule } from './campaign/campaign.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot(dataSourceOptions),
+    ScheduleModule.forRoot(),
     TestModule,
     SessionModule,
     UserModule,

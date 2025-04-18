@@ -36,8 +36,9 @@ export class CampaignController {
 
     @Get('details')
     async getCampaignbasedsessions(
-        @Body('campaignid') campaignid: number
+        @Query('campaignid') campaignid: number,
+        @Query('empcode') empcode: string
     ) {
-        return this.campaignService.getCampaignbasedsessions(campaignid)
+        return this.campaignService.getCampaignbasedsessions(campaignid, empcode);
     }
 }

@@ -6,6 +6,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Patient_master_entity } from "src/entity/patient_master.entity";
 import { Repository } from "typeorm";
 import { Session } from "src/entity/session.entity";
+import { EditPatientDto } from "./dto/editpatient.dto";
 @Injectable({})
 export class PatientService {
     constructor(
@@ -115,5 +116,78 @@ export class PatientService {
                 }
             };
         });
+    }
+
+    async EditPatient(dto: EditPatientDto,  pre_url?: string, rep_url?: string) {
+        try {
+            // first find patient
+            const find_patient = await this.patientRepository.findOne({
+                where: {
+                    patient_code: dto.patientcode
+                }
+            });
+
+            if (!find_patient) {
+                throw new HttpException("Patient not found", HttpStatus.NOT_FOUND);
+            }
+
+            // update patient
+            if (dto.name) find_patient.patient_name = dto.name;
+            if (dto.age) find_patient.patient_age = dto.age;
+            if (dto.gender) find_patient.patient_gender = dto.gender;
+            if (pre_url) find_patient.prescription_img = pre_url;
+            if (rep_url) find_patient.report_img = rep_url;
+
+            await this.patientRepository.save(find_patient);
+
+            return {
+                message: "Patient updated successfully",
+                patient: {
+                    id: find_patient.id,
+                    name: find_patient.patient_name,
+                    age: find_patient.patient_age,
+                    gender: find_patient.patient_gender,
+                    prescription_img: find_patient.prescription_img,
+                    report_img: find_patient.report_img
+                }
+            }
+            //
+        } catch (err) {
+            throw new HttpException(
+                err instanceof HttpException ? err.getResponse() : "Internal Server Error",
+                err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    async ViewPatientDetails(patientcode: string) {
+        try {
+            const find_patient = await this.patientRepository.findOne({
+                where: {
+                    patient_code: patientcode
+                }
+            });
+
+            if (!find_patient) {
+                throw new HttpException("Patient not found", HttpStatus.NOT_FOUND);
+            }
+
+            return {
+                message: "Patient details",
+                patient: {
+                    id: find_patient.id,
+                    name: find_patient.patient_name,
+                    age: find_patient.patient_age,
+                    gender: find_patient.patient_gender,
+                    prescription_img: find_patient.prescription_img,
+                    report_img: find_patient.report_img
+                }
+            }
+        } catch (err) {
+            throw new HttpException(
+                err instanceof HttpException ? err.getResponse() : "Internal Server Error",
+                err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }   
     }
 }

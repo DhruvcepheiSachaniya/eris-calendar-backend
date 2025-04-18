@@ -56,6 +56,7 @@ export class SessionService {
                 const newSession = manager.create(Session, {
                     campaign,
                     dr_code: dto.drCode,
+                    dr_speciality: dto.drspeciality,
                     empCode: dto.empCode,
                     date,
                     start_time: startTime,
@@ -81,30 +82,30 @@ export class SessionService {
                 where: { id: sessionId },
                 lock: { mode: "pessimistic_write" }
             });
-    
+
             if (!session) {
                 throw new HttpException('Session not found', HttpStatus.NOT_FOUND);
             }
-    
+
             // 2. Status validation
             if (session.status !== SessionStatus.Scheduled) {
                 throw new HttpException(
-                    `Session cannot be started (current status: ${session.status})`, 
+                    `Session cannot be started (current status: ${session.status})`,
                     HttpStatus.BAD_REQUEST
                 );
             }
-    
+
             // 3. Time calculations (all in UTC)
             const now = new Date();
             const scheduledStart = new Date(session.start_time);
             const scheduledEnd = new Date(session.end_time);
             const originalDuration = scheduledEnd.getTime() - scheduledStart.getTime();
-    
+
             // 4. Buffer period calculation (UTC)
             const bufferEnd = new Date(scheduledStart);
             bufferEnd.setUTCDate(bufferEnd.getUTCDate() + 1);
             bufferEnd.setUTCHours(23, 59, 59, 999);
-    
+
             // 5. Time validations
             if (now < scheduledStart) {
                 throw new HttpException(
@@ -112,18 +113,18 @@ export class SessionService {
                     HttpStatus.BAD_REQUEST
                 );
             }
-    
+
             if (now > bufferEnd) {
                 throw new HttpException(
                     'Session can only be started within 1 day after scheduled date',
                     HttpStatus.BAD_REQUEST
                 );
             }
-    
+
             // 6. Calculate new time slot
             const newStart = now;
             const newEnd = new Date(now.getTime() + originalDuration);
-    
+
             // 7. Check for conflicts (global time slot check)
             const conflictingSession = await manager.createQueryBuilder(Session, "s")
                 .where("s.id != :sessionId", { sessionId })
@@ -135,7 +136,7 @@ export class SessionService {
                     newEnd
                 })
                 .getOne();
-    
+
             if (conflictingSession) {
                 throw new HttpException({
                     statusCode: HttpStatus.CONFLICT,
@@ -146,16 +147,16 @@ export class SessionService {
                     }
                 }, HttpStatus.CONFLICT);
             }
-    
+
             // 8. Update session
             session.status = SessionStatus.Started;
             session.start_time = newStart;
             session.end_time = newEnd;
             session.buffer_used = this.isBufferPeriodUsed(scheduledStart, newStart);
             // session.actual_start_time = now;
-    
+
             await manager.save(session);
-    
+
             return {
                 status: "success",
                 session: {
@@ -166,14 +167,14 @@ export class SessionService {
             };
         });
     }
-    
+
     private isBufferPeriodUsed(scheduledStart: Date, actualStart: Date): boolean {
         const scheduledDay = new Date(scheduledStart);
         scheduledDay.setUTCHours(0, 0, 0, 0);
-        
+
         const actualDay = new Date(actualStart);
         actualDay.setUTCHours(0, 0, 0, 0);
-    
+
         return actualDay.getTime() !== scheduledDay.getTime();
     }
 
@@ -184,52 +185,61 @@ export class SessionService {
                 where: { id: dto.sessionId },
                 lock: { mode: "pessimistic_write" }
             });
-    
+
             if (!session) {
                 throw new HttpException("Session not found", HttpStatus.NOT_FOUND);
             }
-    
+
             // 2. Prevent editing ended sessions
             if (session.status === SessionStatus.Ended) {
                 throw new HttpException("Cannot edit an ended session", HttpStatus.BAD_REQUEST);
             }
-    
+
+            // 3. Apply 1-day buffer logic
+            const now = new Date();
+            const scheduledStart = new Date(session.start_time);
+            const bufferEnd = new Date(scheduledStart);
+            bufferEnd.setUTCDate(bufferEnd.getUTCDate() + 1);
+            bufferEnd.setUTCHours(23, 59, 59, 999);
+
+            if (now > bufferEnd) {
+                throw new HttpException(
+                    'Session can only be edited within 1 day after scheduled date',
+                    HttpStatus.BAD_REQUEST
+                );
+            }
+
             // 3. Validate time consistency
             if (dto.startTime || dto.endTime) {
                 const startTime = dto.startTime ? new Date(dto.startTime) : session.start_time;
                 const endTime = dto.endTime ? new Date(dto.endTime) : session.end_time;
-                
+
                 if (startTime >= endTime) {
                     throw new HttpException("End time must be after start time", HttpStatus.BAD_REQUEST);
                 }
             }
-    
+
             // 4. Check for session overlaps (excluding current session)
             if (dto.startTime || dto.endTime || dto.date) {
                 const checkDate = dto.date ? new Date(dto.date) : session.date;
                 const checkStart = dto.startTime ? new Date(dto.startTime) : session.start_time;
                 const checkEnd = dto.endTime ? new Date(dto.endTime) : session.end_time;
-    
+
                 const overlappingSession = await transactionalEntityManager
                     .createQueryBuilder(Session, "s")
                     .where("s.id != :sessionId", { sessionId: session.id })
                     .andWhere("s.dr_code = :drCode", { drCode: dto.drCode || session.dr_code })
-                    .andWhere("s.status NOT IN (:...excludedStatuses)", { 
-                        excludedStatuses: [SessionStatus.Ended] 
+                    .andWhere("s.status NOT IN (:...excludedStatuses)", {
+                        excludedStatuses: [SessionStatus.Ended]
                     })
                     .andWhere(`
-                        (s.date = :date AND (
-                            (s.start_time < :end AND s.end_time > :start) OR
-                            (s.start_time >= :start AND s.end_time <= :end) OR
-                            (s.start_time <= :start AND s.end_time >= :end)
-                        ))
-                    `, { 
-                        date: checkDate,
+                        (s.start_time < :end AND s.end_time > :start)
+                    `, {
                         start: checkStart,
-                        end: checkEnd 
+                        end: checkEnd
                     })
                     .getOne();
-    
+
                 if (overlappingSession) {
                     throw new HttpException({
                         statusCode: HttpStatus.CONFLICT,
@@ -241,7 +251,7 @@ export class SessionService {
                     }, HttpStatus.CONFLICT);
                 }
             }
-    
+
             // 5. Update campaign if changed
             if (dto.Study) {
                 const campaign = await transactionalEntityManager.findOne(Campaign, {
@@ -252,7 +262,7 @@ export class SessionService {
                 }
                 session.campaign = campaign;
             }
-    
+
             // 6. Apply updates
             if (dto.drCode) session.dr_code = dto.drCode;
             if (dto.empCode) session.empCode = dto.empCode;
@@ -260,9 +270,9 @@ export class SessionService {
             if (dto.startTime) session.start_time = new Date(dto.startTime);
             if (dto.endTime) session.end_time = new Date(dto.endTime);
             if (dto.select_reason) session.select_reson = dto.select_reason;
-    
+
             const updatedSession = await transactionalEntityManager.save(session);
-    
+
             return {
                 status: "success",
                 session: updatedSession
@@ -279,14 +289,14 @@ export class SessionService {
                 },
                 relations: ['campaign', 'patient']
             });
-            
+
             if (!session) {
                 throw new HttpException("Session not found", HttpStatus.NOT_FOUND);
             }
-            
+
             // Doctor Details from external API
             const external_doc_api = `http://localhost:4444/api/drdetails?drCode=${session.dr_code}`;
-            
+
             let doctorData;
             try {
                 const doctorResponse = await axios.get(external_doc_api, {
@@ -299,19 +309,19 @@ export class SessionService {
                 console.error("Failed to fetch doctor details:", error.message);
                 throw new HttpException("Failed to fetch doctor details", HttpStatus.SERVICE_UNAVAILABLE);
             }
-            
+
             // Calculate campaign summary metrics
             const totalPatients = session.patient ? session.patient.length : 0;
             const totalRxGenerated = session.patient ? session.patient.filter(p => p.prescription_img).length : 0;
             const totalReportsGenerated = session.patient ? session.patient.filter(p => p.report_img).length : 0;
-            
+
             const result = {
                 sessionId: session.id,
                 date: session.date,
                 startTime: session.start_time,
                 endTime: session.end_time,
                 status: session.status,
-                
+
                 // Doctor details
                 drcode: session.dr_code,
                 division: doctorData?.divisionname,
@@ -321,18 +331,18 @@ export class SessionService {
                 hq: doctorData?.hq,
                 empname: doctorData?.empname,
                 region: doctorData?.regionname,
-                
+
                 // Campaign details
                 campaignName: session.campaign?.name,
                 campaignDescription: session.campaign?.description,
                 campaignDate: session.campaign?.created_at,
-                
+
                 // Campaign summary (uncomment when ready)
                 camp_total_patient: totalPatients,
                 total_rx_generated: totalRxGenerated,
                 total_report_generated: totalReportsGenerated
             };
-            
+
             return {
                 status: "success",
                 result
@@ -352,38 +362,38 @@ export class SessionService {
                 where: { id: dto.sessionid },
                 lock: { mode: "pessimistic_write" },
             });
-    
+
             if (!session) {
                 throw new HttpException("Session not found", HttpStatus.NOT_FOUND);
             }
-    
+
             // 2. Validate session state
             if (session.status === SessionStatus.Ended) {
                 throw new HttpException("Session already ended", HttpStatus.BAD_REQUEST);
             }
-    
+
             if (session.status === SessionStatus.Scheduled) {
                 throw new HttpException("Cannot end a session that hasn't started", HttpStatus.BAD_REQUEST);
             }
-    
+
             // 3. Validate end time consistency
             const now = new Date();
             if (now < session.start_time) {
                 throw new HttpException(
-                    "Cannot end session before start time", 
+                    "Cannot end session before start time",
                     HttpStatus.BAD_REQUEST
                 );
             }
-    
+
             // 4. Update session
             session.status = SessionStatus.Ended;
             session.end_time = now; // Record actual end time
             session.camp_executed = dto.cam_excecuted;
             session.dr_kit_delivered = dto.kit_distributed;
-    
+
             // 5. Save and trigger post-end actions
             await transactionalEntityManager.save(session);
-    
+
             return {
                 status: "success",
                 sessionId: session.id,
@@ -412,6 +422,47 @@ export class SessionService {
                 patientCount: session?.patients?.length,
             }
 
+        } catch (err) {
+            throw new HttpException(
+                err instanceof HttpException ? err.getResponse() : "Internal Server Error",
+                err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+    async GetsessionBasedpatient(sessionid: number) {
+        try {
+            // return ---> total patient, total patient prescriptions, total patient report
+            const find_session = await this.sessionRepository.findOne({
+                where: {
+                    id: sessionid,
+                },
+                relations: ['patients']
+            });
+
+            if (!find_session) {
+                throw new HttpException(
+                    "Session not found",
+                    HttpStatus.NOT_FOUND
+                );
+            }
+
+            const patientCount = find_session.patients?.length || 0;
+            const pre_count = find_session.patients?.reduce(
+                (acc, patient) => acc + (patient.prescription_img?.length || 0),
+                0
+            );
+            const rep_count = find_session.patients?.reduce(
+                (acc, patient) => acc + (patient.report_img?.length || 0),
+                0
+            );
+
+            return {
+                status: "success",
+                find_session,
+                patientCount,
+                pre_count,
+                rep_count
+            }
         } catch (err) {
             throw new HttpException(
                 err instanceof HttpException ? err.getResponse() : "Internal Server Error",

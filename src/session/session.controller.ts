@@ -3,6 +3,7 @@ import { SessionService } from "./session.service";
 import { AddSessionDto } from "./dto/addsession.dto";
 import { EditSessionDto } from "./dto/editsession.dto";
 import { EndSessionDto } from "./dto/endsession.dto";
+import { Cron } from "@nestjs/schedule";
 
 @Controller('api/session')
 export class SessionController {
@@ -53,5 +54,18 @@ export class SessionController {
         @Query('sessionid') sessionid: number
     ) {
         return this.sessionService.GetSessionPatientCount(sessionid);
+    }
+
+    @Get('patient/list')
+    async getsessionbasedlist(
+        @Query('sessionid') sessionid: number
+    ) {
+        return this.sessionService.GetsessionBasedpatient(sessionid);
+    }
+
+    // Task Scheduling
+    @Cron('45 * * * * *')
+    async TaskScheduling() {
+        return console.log('Task Scheduling');
     }
 }
