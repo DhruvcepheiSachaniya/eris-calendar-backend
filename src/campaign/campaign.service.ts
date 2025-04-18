@@ -4,6 +4,9 @@ import axios from "axios";
 import { Campaign } from "src/entity/campaign.entity";
 import { SessionStatus } from "src/entity/session.entity";
 import { Repository } from "typeorm";
+import * as dotenv from 'dotenv';
+ 
+dotenv.config();
 
 @Injectable({})
 export class CampaignService {
@@ -107,7 +110,7 @@ export class CampaignService {
     async getAllCampaign(empcode: string) {
         try {
             // Fetch doctor list from external api
-            const externalAPI = `http://localhost:4444/api/doctorlist?empCode=${empcode}`;
+            const externalAPI = `${process.env.EXTERNAL_URL}/doctorlist?empCode=${empcode}`;
             
             const external_response = await axios.get(externalAPI);
             
@@ -115,7 +118,7 @@ export class CampaignService {
             
             // Fetch all campaigns with their sessions and patients
             const all_campaign = await this.campaignRepository.find({
-                relations: ['sessions', 'sessions.patients']
+                relations: ['sessions', 'sessions.patients', 'sessions.campaign']
             });
             
             if (!all_campaign || all_campaign.length === 0) {
@@ -125,6 +128,8 @@ export class CampaignService {
             // Filter and process campaigns based on valid doctor codes
             let total_scheduled_sessions = 0;
             let total_session_completed = 0;
+            let targeted_doctors = 0;
+            let targeted_sessions = 0;
             const doctorSet = new Set<string>();
             let total_patients = 0;
             
@@ -151,10 +156,11 @@ export class CampaignService {
                     if (session.dr_code) {
                         doctorSet.add(session.dr_code);
                     }
-                    
                     total_patients += session.patients?.length || 0;
                 });
                 
+                targeted_sessions += filteredCampaign.sessions.length;
+                targeted_doctors = external_response?.data?.doctors?.length || 0;
                 return filteredCampaign;
             });
             
@@ -162,6 +168,8 @@ export class CampaignService {
                 status: "success",
                 stats: {
                     scheduled_sessions: total_scheduled_sessions,
+                    targeted_sessions: targeted_sessions,
+                    targeted_doctors: targeted_doctors,
                     session_completed: total_session_completed,
                     associated_doctor: doctorSet.size,
                     total_patients: total_patients
@@ -189,7 +197,7 @@ export class CampaignService {
     async getCampaignbasedsessions(campaignid: number, empcode: string) {
         try {
             // 1. Fetch valid doctor codes from external API
-            const externalAPI = `http://localhost:4444/api/doctorlist?empCode=${empcode}`;
+            const externalAPI = `${process.env.EXTERNAL_URL}/doctorlist?empCode=${empcode}`;
             
             const external_response = await axios.get(externalAPI);
             

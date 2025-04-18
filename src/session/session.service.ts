@@ -8,6 +8,9 @@ import { EditSessionDto } from "./dto/editsession.dto";
 import * as moment from 'moment';
 import axios from "axios";
 import { EndSessionDto } from "./dto/endsession.dto";
+import * as dotenv from 'dotenv';
+ 
+dotenv.config();
 
 @Injectable({})
 export class SessionService {
@@ -287,7 +290,7 @@ export class SessionService {
                 where: {
                     id: sessionId
                 },
-                relations: ['campaign', 'patient']
+                relations: ['campaign', "patients"]
             });
 
             if (!session) {
@@ -295,16 +298,12 @@ export class SessionService {
             }
 
             // Doctor Details from external API
-            const external_doc_api = `http://localhost:4444/api/drdetails?drCode=${session.dr_code}`;
-
+            const external_doc_api = `${process.env.EXTERNAL_URL}/drdetails?drcode=${session.dr_code}`
             let doctorData;
             try {
-                const doctorResponse = await axios.get(external_doc_api, {
-                    headers: {
-                        "Content-Type": "application/json"
-                    }
-                });
+                const doctorResponse = await axios.get(external_doc_api);
                 doctorData = doctorResponse.data.doctor;
+                // console.log(doctorData)
             } catch (error) {
                 console.error("Failed to fetch doctor details:", error.message);
                 throw new HttpException("Failed to fetch doctor details", HttpStatus.SERVICE_UNAVAILABLE);
@@ -348,6 +347,16 @@ export class SessionService {
                 result
             };
         } catch (err) {
+            if (err.response) {
+                console.error('Error status:', err.response.status);
+                console.error('Error data:', err.response.data);
+        
+                // Bubble up microservice error
+                throw new HttpException(
+                    err.response.data?.message || 'External service error',
+                    err.response.status
+                );
+            }
             throw new HttpException(
                 err instanceof HttpException ? err.getResponse() : "Internal Server Error",
                 err instanceof HttpException ? err.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR

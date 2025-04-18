@@ -1,5 +1,8 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import axios from "axios";
+import * as dotenv from 'dotenv';
+ 
+dotenv.config();
 
 @Injectable({})
 export class DoctorService {
@@ -8,7 +11,7 @@ export class DoctorService {
     async GetDoctorList(empcode: string) {
         try {
             // Fetch doctor list from external api
-            const externalAPI = `http://localhost:4444/api/doctorlist?empCode=${empcode}`;
+            const externalAPI = `${process.env.EXTERNAL_URL}/doctorlist?empCode=${empcode}`;
 
             const external_response = await axios.get(externalAPI);
 
@@ -44,8 +47,9 @@ export class DoctorService {
 
     async GetDoctorDetails(drCode: string) {
         try {
+            console.log(drCode);
             // Doctor Details from external API
-            const external_doc_api = `http://localhost:4444/api/drdetails?drCode=${drCode}`;
+            const external_doc_api = `${process.env.EXTERNAL_URL}/drdetails?drcode=${drCode}`;
             const response = await axios.get(external_doc_api);
 
             return response?.data?.doctor;
