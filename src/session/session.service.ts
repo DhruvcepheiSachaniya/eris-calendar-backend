@@ -9,7 +9,7 @@ import * as moment from 'moment';
 import axios from "axios";
 import { EndSessionDto } from "./dto/endsession.dto";
 import * as dotenv from 'dotenv';
- 
+
 dotenv.config();
 
 @Injectable({})
@@ -33,11 +33,21 @@ export class SessionService {
                 throw new HttpException("End time must be after start time", HttpStatus.BAD_REQUEST);
             }
 
+            const externalAPI = `${process.env.EXTERNAL_URL}/doctorlist?empCode=${dto.empCode}`;
+            
+            const external_response = await axios.get(externalAPI);
+            
+            const validDoctorCodes: string[] = external_response.data?.doctors?.map(d => d.drCode) || [];
+
+            if (!validDoctorCodes.includes(dto.drCode)) {
+                throw new HttpException("Doctor not under your hierarchy", HttpStatus.FORBIDDEN);
+            }
+
             return await this.sessionRepository.manager.transaction(async (manager) => {
                 // Overlap check with precise comparisons
                 const existing = await manager.createQueryBuilder(Session, "session")
-                    // .where("session.dr_code = :drCode", { drCode: dto.drCode })
-                    .andWhere("DATE(session.date) = DATE(:date)", { date })
+                    .where("session.dr_code IN (:...doctorCodes)", { doctorCodes: validDoctorCodes })
+                    // .andWhere("DATE(session.date) = DATE(:date)", { date })
                     .andWhere("session.start_time < :end AND session.end_time > :start", {
                         start: startTime,
                         end: endTime
@@ -112,7 +122,7 @@ export class SessionService {
             // 5. Time validations
             if (now < scheduledStart) {
                 throw new HttpException(
-                    `Cannot start before scheduled time (${scheduledStart.toISOString()})`,
+                    `Cannot start before scheduled time (${scheduledStart})`,
                     HttpStatus.BAD_REQUEST
                 );
             }
@@ -198,6 +208,16 @@ export class SessionService {
                 throw new HttpException("Cannot edit an ended session", HttpStatus.BAD_REQUEST);
             }
 
+            const externalAPI = `${process.env.EXTERNAL_URL}/doctorlist?empCode=${dto.empCode}`;
+            
+            const external_response = await axios.get(externalAPI);
+            
+            const validDoctorCodes: string[] = external_response.data?.doctors?.map(d => d.drCode) || [];
+
+            if (!validDoctorCodes.includes(dto.drCode)) {
+                throw new HttpException("Doctor not under your hierarchy", HttpStatus.FORBIDDEN);
+            }
+
             // 3. Apply 1-day buffer logic
             const now = new Date();
             const scheduledStart = new Date(session.start_time);
@@ -231,7 +251,8 @@ export class SessionService {
                 const overlappingSession = await transactionalEntityManager
                     .createQueryBuilder(Session, "s")
                     .where("s.id != :sessionId", { sessionId: session.id })
-                    .andWhere("s.dr_code = :drCode", { drCode: dto.drCode || session.dr_code })
+                    // .andWhere("s.dr_code = :drCode", { drCode: dto.drCode || session.dr_code })
+                    .andWhere("s.dr_code IN (:...doctorCodes)", { doctorCodes: validDoctorCodes })
                     .andWhere("s.status NOT IN (:...excludedStatuses)", {
                         excludedStatuses: [SessionStatus.Ended]
                     })
@@ -310,9 +331,10 @@ export class SessionService {
             }
 
             // Calculate campaign summary metrics
-            const totalPatients = session.patient ? session.patient.length : 0;
-            const totalRxGenerated = session.patient ? session.patient.filter(p => p.prescription_img).length : 0;
-            const totalReportsGenerated = session.patient ? session.patient.filter(p => p.report_img).length : 0;
+            const totalPatients = session.patients ? session.patients.length : 0;
+            const totalRxGenerated = session.patients ? session.patients.filter(p => p.prescription_img).length : 0;
+            const totalReportsGenerated = session.patients ? session.patients.filter(p => p.report_img).length : 0;
+
 
             const result = {
                 sessionId: session.id,
@@ -350,7 +372,7 @@ export class SessionService {
             if (err.response) {
                 console.error('Error status:', err.response.status);
                 console.error('Error data:', err.response.data);
-        
+
                 // Bubble up microservice error
                 throw new HttpException(
                     err.response.data?.message || 'External service error',
@@ -457,11 +479,12 @@ export class SessionService {
 
             const patientCount = find_session.patients?.length || 0;
             const pre_count = find_session.patients?.reduce(
-                (acc, patient) => acc + (patient.prescription_img?.length || 0),
+                (acc, patient) => acc + (patient.prescription_img ? 1 : 0),
                 0
             );
+
             const rep_count = find_session.patients?.reduce(
-                (acc, patient) => acc + (patient.report_img?.length || 0),
+                (acc, patient) => acc + (patient.report_img ? 1 : 0),
                 0
             );
 

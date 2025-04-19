@@ -18,7 +18,7 @@ export class SessionController {
     ) { }
 
     // ? Add Session
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Post('add')
     async AddSession(
         @Body() dto: AddSessionDto
@@ -26,7 +26,7 @@ export class SessionController {
         return this.sessionService.AddSession(dto);
     }
 
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Post('start')
     async StartSession(
         @Body('sessionid') sessionid: number
@@ -35,7 +35,7 @@ export class SessionController {
     }
 
     // ? Edit Session
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Put('edit')
     async EditSession(
         @Body() dto: EditSessionDto
@@ -44,7 +44,7 @@ export class SessionController {
     }
 
     // ? Get One Session detail and summary
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Get('enddetail')
     async GetSessionDetail(
         @Query('sessionid') sessionid: number
@@ -53,7 +53,7 @@ export class SessionController {
         return this.sessionService.GetSessionDetails(sessionid);
     }
 
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Post('end')
     async EndSession(
         @Body() dto: EndSessionDto 

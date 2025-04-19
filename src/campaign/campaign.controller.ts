@@ -26,7 +26,7 @@ export class CampaignController {
     }
 
     // ? Get Campaign List
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Get('list')
     async GetCampaignList(
         @Query('empcode') empcode: string
@@ -34,7 +34,7 @@ export class CampaignController {
         return this.campaignService.getAllCampaign(empcode);
     }
 
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Get('details')
     async getCampaignbasedsessions(
         @Query('campaignid') campaignid: number,

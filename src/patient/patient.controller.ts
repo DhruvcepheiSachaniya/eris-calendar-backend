@@ -12,7 +12,7 @@ export class PatientController {
     ) { }
 
     //add patient, edit patient, patient terms and condition, view patient
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Post('add')
     @UseInterceptors(FileFieldsInterceptor([
         { name: 'pre_img', maxCount: 1 },
@@ -33,7 +33,7 @@ export class PatientController {
     }
 
     // Edit Details, get patient details, based doctor details
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Post('edit')
     @UseInterceptors(FileFieldsInterceptor([
         { name: 'pre_img', maxCount: 1 },
@@ -56,7 +56,7 @@ export class PatientController {
         return this.patientService.EditPatient(dto, pre_url, rep_url);
     }
 
-    // @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard)
     @Get('details')
     async GetPatientDetails(@Query('patientcode') patientcode: string) {
         return this.patientService.ViewPatientDetails(patientcode);
